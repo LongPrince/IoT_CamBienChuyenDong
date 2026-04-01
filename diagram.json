@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "author": "Uri Shaked",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": -4.76, "attrs": {} },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir", "top": -63.2, "left": -247.38, "attrs": {} },
+    { "type": "wokwi-led", "id": "led", "top": 6, "left": 224.6, "attrs": { "color": "red" } },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": -93.6, "left": 155.4, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "pir:VCC", "esp:5V", "red", [ "v172.8", "h215.81" ] ],
+    [ "pir:GND", "esp:GND", "black", [] ],
+    [ "pir:OUT", "esp:GPIO13", "green", [] ],
+    [ "led:A", "esp:GPIO2", "green", [] ],
+    [ "led:C", "esp:GND", "black", [] ],
+    [ "buzzer:1", "esp:GPIO4", "green", [] ],
+    [ "buzzer:2", "esp:GND", "black", [] ],
+    [ "esp:13", "pir:OUT", "green", [ "h0" ] ],
+    [ "pir:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "esp:2", "led:A", "green", [ "h0" ] ],
+    [ "led:C", "esp:GND.3", "green", [ "v0" ] ],
+    [ "esp:4", "buzzer:2", "green", [ "h0" ] ],
+    [ "buzzer:1", "esp:GND.3", "green", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

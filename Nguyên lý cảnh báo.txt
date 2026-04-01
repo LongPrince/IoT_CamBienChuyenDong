@@ -1,0 +1,12 @@
+Nguyên lý cảnh báo
+
+- Phát hiện có người
+- Đếm tổng thời gian mở cửa để xem thử lưu lượng khách, hết ngày thì reset lại (để thống kê tương quan khách đông hay ít)
+
+- Cảnh báo khi cửa mở sai cách (quá thời gian mở)
++ 
+- Đếm số lần đóng mở để bảo trì ví dụ 10000
+
+//
+Nút đóng mở( bật là mở cửa liên tục,tắt mở lại chế độ tự động)
+Link slide show: https://canva.link/v2qipxdy0rv8vp8

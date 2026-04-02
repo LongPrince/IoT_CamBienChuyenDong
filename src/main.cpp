@@ -7,12 +7,12 @@
 // --- CẤU HÌNH ---
 const char* ssid        = "Wokwi-GUEST";
 const char* password    = "";
-const char* mqtt_server = "0acb987148084628b41bbeed64717bab.s1.eu.hivemq.cloud";
-const char* mqtt_user   = "danglong_esp8266";
-const char* mqtt_pass   = "Long@123";
+const char* mqtt_server = "*";
+const char* mqtt_user   = "*";
+const char* mqtt_pass   = "*";
 
 const char* mqtt_topic_data    = "iot/door/data"; 
-const char* mqtt_topic_control = "iot/door/control"; // Topic mới để nhận lệnh điều khiển
+const char* mqtt_topic_control = "iot/door/control"; 
 
 #define PIR_PIN     13    
 #define LED_PIN     2     
@@ -25,7 +25,7 @@ PubSubClient client(espClient);
 bool isDoorOpen = false;
 unsigned long openStartTime = 0;
 bool warningSent = false;
-const unsigned long MAX_OPEN_TIME = 10000; 
+const unsigned long MAX_OPEN_TIME = 10000; // 10 giây để test nhanh
 
 unsigned long totalDailyOpenTime = 0;
 int doorCycleCount = 0;               
@@ -38,19 +38,23 @@ bool isManualMode = false;
 void sendStatusToNodeRed(String eventType, String alertMsg) {
   JsonDocument doc;
   
-  if (eventType != "door_closed") {
-    doc["event"] = eventType;
-  }
-  
+  doc["event"] = eventType;
   doc["total_time_day"] = totalDailyOpenTime;
   doc["cycle_count"] = doorCycleCount;
   doc["alert"] = alertMsg;
-  doc["maintenance"] = (doorCycleCount >= 5) ? "REQUIRED" : "OK";
+
+  // Logic phân loại bảo trì
+  if (isManualMode) {
+    doc["maintenance"] = "UNDER_MAINTENANCE"; // Đang trong quá trình can thiệp
+  } else {
+    doc["maintenance"] = (doorCycleCount >= 5) ? "REQUIRED" : "OK";
+  }
 
   char buffer[256];
   serializeJson(doc, buffer);
   client.publish(mqtt_topic_data, buffer);
-  Serial.print("Data sent: ");
+  
+  Serial.print("--- Data sent to MQTT: ");
   Serial.println(buffer);
 }
 
@@ -61,24 +65,35 @@ void callback(char* topic, byte* payload, unsigned int length) {
     message += (char)payload[i];
   }
   
-  Serial.print("Nhận lệnh từ MQTT: ");
+  Serial.print("\n[MQTT] Lệnh nhận được: ");
   Serial.println(message);
 
   if (String(topic) == mqtt_topic_control) {
     if (message == "MANUAL_ON") {
+      // Nếu đang mở cửa ở chế độ AUTO mà bị ngắt bằng MANUAL, hãy chốt số liệu cũ
+      if (isDoorOpen && !isManualMode) {
+        unsigned long sessionTime = (millis() - openStartTime) / 1000;
+        totalDailyOpenTime += sessionTime;
+        doorCycleCount++;
+      }
+
       isManualMode = true;
-      isDoorOpen = false;         // Reset trạng thái auto
+      isDoorOpen = false; 
       warningSent = false;
-      digitalWrite(LED_PIN, HIGH); // Ép bật đèn LED (Mở cửa)
-      noTone(BUZZER_PIN);          // Tắt còi nếu đang kêu
-      Serial.println("Chế độ: THỦ CÔNG (Mở cửa tự do, vô hiệu hóa PIR)");
-      sendStatusToNodeRed("manual_mode", "Manual door open");
+      
+      digitalWrite(LED_PIN, HIGH); // Ép bật đèn (Cửa mở để bảo trì)
+      noTone(BUZZER_PIN);          // Tắt còi báo động cũ
+      
+      Serial.println(">>> CHẾ ĐỘ THỦ CÔNG: Đang bảo trì...");
+      sendStatusToNodeRed("manual_start", "Maintenance in progress");
     } 
     else if (message == "AUTO") {
       isManualMode = false;
-      digitalWrite(LED_PIN, LOW);  // Tắt đèn LED, chờ PIR
-      Serial.println("Chế độ: TỰ ĐỘNG (Quay lại dùng cảm biến PIR)");
-      sendStatusToNodeRed("auto_mode", "Auto mode restored");
+      doorCycleCount = 0; // FIX: Reset bộ đếm vì coi như đã bảo trì xong
+      
+      digitalWrite(LED_PIN, LOW); 
+      Serial.println(">>> CHẾ ĐỘ TỰ ĐỘNG: Đã reset bộ đếm.");
+      sendStatusToNodeRed("auto_restore", "System cleaned and reset");
     }
   }
 }
@@ -100,9 +115,11 @@ void reconnect() {
     String clientId = "ESP32-Door-" + String(random(0xffff), HEX);
     if (client.connect(clientId.c_str(), mqtt_user, mqtt_pass)) {
       Serial.println("Connected!");
-      // ĐĂNG KÝ NHẬN LỆNH KHI KẾT NỐI THÀNH CÔNG
       client.subscribe(mqtt_topic_control); 
     } else {
+      Serial.print("Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5s");
       delay(5000);
     }
   }
@@ -113,49 +130,57 @@ void setup() {
   pinMode(PIR_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+  
   setup_wifi();
   client.setServer(mqtt_server, 8883);
-  client.setCallback(callback); // Cài đặt hàm callback nhận dữ liệu
+  client.setCallback(callback);
+  
   lastResetMillis = millis();
+  Serial.println("--- HỆ THỐNG SẴN SÀNG ---");
 }
 
 void loop() {
   if (!client.connected()) reconnect();
   client.loop();
 
+  // Tự động reset thông số sau 24h
   if (millis() - lastResetMillis > 86400000) {
     totalDailyOpenTime = 0;
     doorCycleCount = 0;
     lastResetMillis = millis();
-    sendStatusToNodeRed("daily_reset", "System reset for new day");
+    sendStatusToNodeRed("daily_reset", "New day data cleared");
   }
 
-  // NẾU ĐANG Ở CHẾ ĐỘ THỦ CÔNG -> BỎ QUA TOÀN BỘ LOGIC CẢM BIẾN DƯỚI ĐÂY
+  // --- NẾU ĐANG MANUAL: KHÔNG CHẠY LOGIC CẢM BIẾN ---
   if (isManualMode) {
-    delay(100);
-    return; // Kết thúc vòng lặp loop tại đây, không đọc PIR nữa
+    delay(200);
+    return; 
   }
 
-  // --- LOGIC TỰ ĐỘNG BẰNG PIR DƯỚI NÀY CHỈ CHẠY KHI TẮT NÚT MANUAL ---
+  // --- LOGIC TỰ ĐỘNG (PIR) ---
   bool currentSensorState = digitalRead(PIR_PIN);
 
+  // 1. Cửa bắt đầu mở
   if (currentSensorState == HIGH && !isDoorOpen) {
     isDoorOpen = true;
     openStartTime = millis();
     warningSent = false;
     digitalWrite(LED_PIN, HIGH);
     tone(BUZZER_PIN, 1500, 150); 
+    Serial.println("Cửa mở (PIR detected)");
   } 
   
+  // 2. Kiểm tra thời gian mở quá lâu
   else if (currentSensorState == HIGH && isDoorOpen) {
     unsigned long currentOpenDuration = millis() - openStartTime;
     if (currentOpenDuration > MAX_OPEN_TIME && !warningSent) {
       tone(BUZZER_PIN, 2000);
       warningSent = true;
-      sendStatusToNodeRed("warning", "Door left open > 10m");
+      sendStatusToNodeRed("warning", "Door left open too long");
     }
   } 
   
+  // 3. Cửa đóng lại
   else if (currentSensorState == LOW && isDoorOpen) {
     isDoorOpen = false;
     digitalWrite(LED_PIN, LOW); 
@@ -167,6 +192,8 @@ void loop() {
     doorCycleCount++;                  
 
     sendStatusToNodeRed("door_closed", warningSent ? "closed_after_timeout" : "normal");
+    Serial.print("Cửa đóng. Lần mở thứ: ");
+    Serial.println(doorCycleCount);
   }
 
   delay(50);

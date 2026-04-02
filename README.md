@@ -53,19 +53,17 @@ Sử dụng node **Function** để phân luồng dữ liệu và node **Templat
 > 🔧 Tình trạng: CẦN KIỂM TRA ĐỊNH KỲ.
 
 ---
+### PHỤ LỤC
+### Phụ lục A:(Mã nguồn chương trình Arduino)
+- https://github.com/LongPrince/IoT_CamBienChuyenDong/blob/master/src/main.cpp 
 
-## 💻 5. Mã nguồn ESP32 (main.cpp)
-```cpp
-/* * Lưu ý: Đã sửa BUZZER_PIN thành 4 để khớp với diagram.json
- */
-#include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <PubSubClient.h>
-
-#define PIR_PIN     13    
-#define LED_PIN     2     
-#define BUZZER_PIN  4    // Cấu hình lại chân theo sơ đồ nối dây
+### Phụ lục B:(Mã nguồn của Web-Node-Red(Json)
+- https://github.com/LongPrince/IoT_CamBienChuyenDong/blob/config-file/Nhom6.json 
 
 
-Link slide show: https://canva.link/v2qipxdy0rv8vp8
+
+
+
+
+
+

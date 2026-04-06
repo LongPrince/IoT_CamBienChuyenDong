@@ -7,9 +7,9 @@
 // --- CẤU HÌNH ---
 const char* ssid        = "Wokwi-GUEST";
 const char* password    = "";
-const char* mqtt_server = "0acb987148084628b41bbeed64717bab.s1.eu.hivemq.cloud";
-const char* mqtt_user   = "danglong_esp8266";
-const char* mqtt_pass   = "Long@123";
+const char* mqtt_server = "*";
+const char* mqtt_user   = "*";
+const char* mqtt_pass   = "*";
 
 const char* mqtt_topic_data    = "iot/door/data"; 
 const char* mqtt_topic_control = "iot/door/control"; // Topic mới để nhận lệnh điều khiển
